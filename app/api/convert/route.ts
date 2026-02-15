@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateUrl, ValidationError } from "@/lib/validator";
-import { extractMainContent } from "@/lib/extractor";
-import { htmlToMarkdown } from "@/lib/converter";
-
-export const runtime = "nodejs";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  console.log("[PageMD] ===== REQUEST START =====");
+  console.log("[PageMD] Method:", request.method);
+  console.log("[PageMD] URL:", request.url);
   try {
     console.log("[PageMD] Request received");
 
@@ -21,18 +19,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     console.log("[PageMD] URL received:", body.url);
 
-    // Validate URL
-    const validationResult = validateUrl(body.url);
-    if (!validationResult.success) {
-      console.log("[PageMD] URL validation failed:", validationResult.error);
+    // Simple URL validation
+    let url: URL;
+    try {
+      url = new URL(body.url);
+      if (url.protocol !== "http:" && url.protocol !== "https:") {
+        throw new Error("Invalid protocol");
+      }
+    } catch {
+      console.log("[PageMD] URL validation failed");
       return NextResponse.json(
-        { error: validationResult.error },
+        { error: "Invalid URL" },
         { status: 400 }
       );
     }
 
-    const url = validationResult.url;
-    console.log("[PageMD] Fetching URL:", url);
+    console.log("[PageMD] Fetching URL:", url.href);
 
     // Fetch webpage with timeout
     const controller = new AbortController();
@@ -40,14 +42,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     let fetchResponse: Response;
     try {
-      // Temporarily disable SSL verification for this fetch
+      // Allow self-signed certificates (needed for some sites)
       const originalRejectUnauthorized = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-
-      // Allow self-signed certificates
       process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
       try {
-        fetchResponse = await fetch(url, {
+        fetchResponse = await fetch(url.href, {
           method: "GET",
           headers: {
             "User-Agent": "PageMD/1.0",
@@ -56,7 +55,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         });
         console.log("[PageMD] Fetch response status:", fetchResponse.status, fetchResponse.statusText);
       } finally {
-        // Restore original values
         if (originalRejectUnauthorized !== undefined) {
           process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalRejectUnauthorized;
         } else {
@@ -82,9 +80,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const html = await fetchResponse.text();
     console.log("[PageMD] HTML received, length:", html.length);
 
-    // Extract main content
+    // Lazy load dependencies (inside the function to avoid module-level import issues)
+    console.log("[PageMD] Loading dependencies...");
+    const { Readability } = await import("@mozilla/readability");
+    const { JSDOM } = await import("jsdom");
+    const TurndownService = (await import("turndown")).default;
+
+    // Extract main content using Mozilla Readability
     console.log("[PageMD] Extracting main content...");
-    const mainContent = extractMainContent(html);
+    const dom = new JSDOM(html, { url: url.href });
+    const doc = dom.window.document;
+    const article = new Readability(doc);
+    const result = article.parse();
+    const mainContent = result?.content || "";
     console.log("[PageMD] Extracted content length:", mainContent.length);
 
     if (!mainContent) {
@@ -95,9 +103,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Convert to markdown
+    // Convert to markdown using Turndown
     console.log("[PageMD] Converting to markdown...");
-    const markdown = htmlToMarkdown(mainContent);
+    const turndownService = new TurndownService({
+      headingStyle: "atx",
+      codeBlockStyle: "fenced",
+    });
+    const markdown = turndownService.turndown(mainContent);
     console.log("[PageMD] Markdown length:", markdown.length);
 
     // Calculate word count
@@ -107,9 +119,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const response = {
       markdown,
       meta: {
-        title: new URL(url).pathname,
-        url,
+        title: result?.title || new URL(url.href).pathname,
+        url: url.href,
         wordCount,
+        excerpt: result?.excerpt || "",
+        byline: result?.byline || "",
         extractionTime: new Date().toISOString(),
       },
     };
