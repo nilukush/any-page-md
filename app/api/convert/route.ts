@@ -2,45 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateUrl, ValidationError } from "@/lib/validator";
 import { extractMainContent } from "@/lib/extractor";
 import { htmlToMarkdown } from "@/lib/converter";
-import https from "https";
-import http from "http";
 
 export const runtime = "nodejs";
-
-async function fetchWithCustomAgent(url: string, timeout: number = 30000): Promise<Response> {
-  const urlObj = new URL(url);
-  const isHttps = urlObj.protocol === "https:";
-  const client = isHttps ? https : http;
-
-  return new Promise((resolve, reject) => {
-    const req = client.request(url, {
-      method: "GET",
-      headers: {
-        "User-Agent": "PageMD/1.0",
-      },
-      // @ts-ignore - Agent options
-      rejectUnauthorized: false, // Ignore SSL certificate errors
-      timeout,
-    }, (res) => {
-      let data = "";
-      res.on("data", (chunk) => data += chunk);
-      res.on("end", () => {
-        const response = new Response(data, {
-          status: res.statusCode,
-          statusText: res.statusMessage || "",
-        });
-        resolve(response);
-      });
-    });
-
-    req.on("error", reject);
-    req.on("timeout", () => {
-      req.destroy();
-      reject(new Error("Request timeout"));
-    });
-    req.end();
-  });
-}
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -64,8 +27,46 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const url = validationResult.url;
 
-    // Fetch webpage with custom agent that ignores SSL errors
-    const fetchResponse = await fetchWithCustomAgent(url, 30000);
+    // Import fetch dynamically to use native Node.js fetch with proper options
+    let fetchResponse: Response;
+    try {
+      // Use native fetch with AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      // Native fetch in Node.js 18+ supports options for SSL
+      // We need to set process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0" before the fetch
+      const originalRejectUnauthorized = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
+      try {
+        fetchResponse = await fetch(url, {
+          method: "GET",
+          headers: {
+            "User-Agent": "PageMD/1.0",
+          },
+          signal: controller.signal,
+        });
+      } finally {
+        // Restore original value
+        if (originalRejectUnauthorized !== undefined) {
+          process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalRejectUnauthorized;
+        } else {
+          delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+        }
+      }
+
+      clearTimeout(timeoutId);
+    } catch (fetchError) {
+      // If native fetch fails, try a different approach
+      if (fetchError instanceof Error && fetchError.name === "AbortError") {
+        return NextResponse.json(
+          { error: "Request timeout - URL took too long to respond" },
+          { status: 408 }
+        );
+      }
+      throw fetchError;
+    }
 
     if (!fetchResponse.ok) {
       return NextResponse.json(
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   } catch (error) {
     // Handle errors
-    if (error instanceof Error && (error.message?.includes("timeout") || error.message?.includes("abort"))) {
+    if (error instanceof Error && error.name === "AbortError") {
       return NextResponse.json(
         { error: "Request timeout - URL took too long to respond" },
         { status: 408 }
