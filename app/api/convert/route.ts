@@ -27,16 +27,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const url = validationResult.url;
 
-    // Import fetch dynamically to use native Node.js fetch with proper options
+    // Fetch webpage with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     let fetchResponse: Response;
     try {
-      // Use native fetch with AbortController for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-      // Native fetch in Node.js 18+ supports options for SSL
-      // We need to set process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0" before the fetch
+      // Temporarily disable SSL verification for this fetch
       const originalRejectUnauthorized = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+      const originalNoCheck = process.env.NODE_EXTRA_CA_CERTS;
+
+      // Allow self-signed certificates
       process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
       try {
@@ -48,24 +49,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           signal: controller.signal,
         });
       } finally {
-        // Restore original value
+        // Restore original values
         if (originalRejectUnauthorized !== undefined) {
           process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalRejectUnauthorized;
         } else {
           delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
         }
-      }
 
-      clearTimeout(timeoutId);
-    } catch (fetchError) {
-      // If native fetch fails, try a different approach
-      if (fetchError instanceof Error && fetchError.name === "AbortError") {
-        return NextResponse.json(
-          { error: "Request timeout - URL took too long to respond" },
-          { status: 408 }
-        );
+        if (originalNoCheck !== undefined) {
+          process.env.NODE_EXTRA_CA_CERTS = originalNoCheck;
+        } else {
+          delete process.env.NODE_EXTRA_CA_CERTS;
+        }
       }
-      throw fetchError;
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     if (!fetchResponse.ok) {
