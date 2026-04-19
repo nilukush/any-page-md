@@ -15,8 +15,8 @@ describe("htmlToMarkdown", () => {
     const result = htmlToMarkdown(html);
     expect(result).toContain("# Title");
     expect(result).toContain("This is a paragraph with [a link](https://example.com).");
-    expect(result).toContain("- Item 1");
-    expect(result).toContain("- Item 2");
+    expect(result).toContain("*   Item 1");
+    expect(result).toContain("*   Item 2");
   });
 
   it("handles code blocks", () => {
