@@ -44,6 +44,23 @@ npm run cli -- https://example.com/article
 npm run cli -- https://example.com/article > article.md
 ```
 
+### Browser Extension Usage
+
+```bash
+# Install the extension
+1. Navigate to chrome://extensions/
+2. Enable "Developer mode"
+3. Click "Load unpacked"
+4. Select the /extension/ directory
+
+# Use the extension
+- Click the PageMD icon in your toolbar
+- Or press Ctrl+Shift+M (Cmd+Shift+M on Mac)
+- Markdown is automatically copied to your clipboard!
+```
+
+See [extension/README.md](extension/README.md) for detailed documentation.
+
 ## Development
 
 ```bash
@@ -111,8 +128,14 @@ npm run lint
 - ✅ Deployed to Vercel
 - ✅ Documentation complete
 
-**Phase 2:** 🚧 In Progress
-- ⏳ Browser extension (planned)
+**Phase 2:** ✅ Complete (v1.0.0)
+- ✅ Browser extension built
+- ✅ One-click conversion from popup
+- ✅ Keyboard shortcut (Ctrl+Shift+M)
+- ✅ Auto-copy to clipboard
+- ✅ Desktop notifications
+
+See `extension/README.md` for installation instructions.
 
 **Phase 3:** ⏳ Not Started
 - ⏳ AI-powered summarization
