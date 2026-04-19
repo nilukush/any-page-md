@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PageMD Icon Converter</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .instructions {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .icon-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+    .icon-card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .icon-preview {
+      background: #f0f0f0;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 15px 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 150px;
+    }
+    canvas {
+      max-width: 100%;
+    }
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+    button:hover {
+      background: #5568d3;
+    }
+    .download-btn {
+      background: #10b981;
+    }
+    .download-btn:hover {
+      background: #059669;
+    }
+    code {
+      background: #f0f0f0;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>PageMD Icon Converter</h1>
+
+  <div class="instructions">
+    <h2>Instructions:</h2>
+    <ol>
+      <li>Click <strong>"Render & Download PNG"</strong> for each icon size below</li>
+      <li>The PNG file will be downloaded automatically</li>
+      <li>Place the downloaded PNG files in the <code>extension/icons/</code> directory</li>
+      <li>Rename them to: <code>icon16.png</code>, <code>icon48.png</code>, <code>icon128.png</code></li>
+    </ol>
+  </div>
+
+  <div class="icon-grid">
+    <div class="icon-card">
+      <h3>16x16 Icon</h3>
+      <div class="icon-preview">
+        <canvas id="canvas16" width="16" height="16"></canvas>
+      </div>
+      <button onclick="convertAndDownload(16)">Render & Download PNG</button>
+    </div>
+
+    <div class="icon-card">
+      <h3>48x48 Icon</h3>
+      <div class="icon-preview">
+        <canvas id="canvas48" width="48" height="48"></canvas>
+      </div>
+      <button onclick="convertAndDownload(48)">Render & Download PNG</button>
+    </div>
+
+    <div class="icon-card">
+      <h3>128x128 Icon</h3>
+      <div class="icon-preview">
+        <canvas id="canvas128" width="128" height="128"></canvas>
+      </div>
+      <button onclick="convertAndDownload(128)">Render & Download PNG</button>
+    </div>
+  </div>
+
+  <script>
+    // SVG definitions for each size
+    const svgs = {
+      16: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none">
+        <rect width="16" height="16" rx="4" fill="url(#g16)"/>
+        <path d="M10 2H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V5l-2-3z" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M9 2v3h3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M7 8h3M7 11h3M7 5h1" stroke="white" stroke-width="1.2" stroke-linecap="round"/>
+        <defs><linearGradient id="g16" x1="0" y1="0" x2="16" y2="16"><stop offset="0%" stop-color="#667eea"/><stop offset="100%" stop-color="#764ba2"/></linearGradient></defs>
+      </svg>`,
+      48: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+        <rect width="48" height="48" rx="12" fill="url(#g48)"/>
+        <path d="M30 6H14a2 2 0 0 0-2 2v32a2 2 0 0 0 2 2h20a2 2 0 0 0 2-2V14l-6-8z" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M27 6v10h10" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M19 22h10M19 28h10M19 34h6" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+        <defs><linearGradient id="g48" x1="0" y1="0" x2="48" y2="48"><stop offset="0%" stop-color="#667eea"/><stop offset="100%" stop-color="#764ba2"/></linearGradient></defs>
+      </svg>`,
+      128: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+        <rect width="128" height="128" rx="32" fill="url(#g128)"/>
+        <path d="M80 16H44a4 4 0 0 0-4 4v88a4 4 0 0 0 4 4h40a4 4 0 0 0 4-4V40l-8-24z" stroke="white" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M72 16v28h28" stroke="white" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M52 58h24M52 74h24M52 90h14" stroke="white" stroke-width="6" stroke-linecap="round"/>
+        <defs><linearGradient id="g128" x1="0" y1="0" x2="128" y2="128"><stop offset="0%" stop-color="#667eea"/><stop offset="100%" stop-color="#764ba2"/></linearGradient></defs>
+      </svg>`
+    };
+
+    // Convert SVG to PNG and download
+    function convertAndDownload(size) {
+      const canvas = document.getElementById(`canvas${size}`);
+      const ctx = canvas.getContext('2d');
+      const svgString = svgs[size];
+
+      // Create a blob from the SVG
+      const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+
+      const img = new Image();
+      img.onload = function() {
+        ctx.clearRect(0, 0, size, size);
+        ctx.drawImage(img, 0, 0, size, size);
+        URL.revokeObjectURL(url);
+
+        // Download the PNG
+        canvas.toBlob(function(blob) {
+          const downloadUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = downloadUrl;
+          a.download = `icon${size}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(downloadUrl);
+        }, 'image/png');
+      };
+      img.src = url;
+    }
+
+    // Pre-render all icons on load
+    window.onload = function() {
+      [16, 48, 128].forEach(size => {
+        const canvas = document.getElementById(`canvas${size}`);
+        const ctx = canvas.getContext('2d');
+        const svgString = svgs[size];
+
+        const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+
+        const img = new Image();
+        img.onload = function() {
+          ctx.drawImage(img, 0, 0, size, size);
+          URL.revokeObjectURL(url);
+        };
+        img.src = url;
+      });
+    };
+  </script>
+</body>
+</html>
