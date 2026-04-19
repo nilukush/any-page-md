@@ -36,16 +36,38 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     console.log("[PageMD] Fetching URL:", url.href);
 
+    // SSL flag - disabled by default, only enabled in development with explicit flag
+    const ALLOW_UNSAFE_SSL = process.env.ALLOW_UNSAFE_SSL === "true";
+
     // Fetch webpage with timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     let fetchResponse: Response;
     try {
-      // Allow self-signed certificates (needed for some sites)
-      const originalRejectUnauthorized = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-      try {
+      if (ALLOW_UNSAFE_SSL) {
+        // Development mode: Allow self-signed certificates
+        console.warn("[PageMD] WARNING: SSL verification disabled - development only");
+        const originalRejectUnauthorized = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+        try {
+          fetchResponse = await fetch(url.href, {
+            method: "GET",
+            headers: {
+              "User-Agent": "PageMD/1.0",
+            },
+            signal: controller.signal,
+          });
+        } finally {
+          // Restore original setting
+          if (originalRejectUnauthorized !== undefined) {
+            process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalRejectUnauthorized;
+          } else {
+            delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+          }
+        }
+      } else {
+        // Production mode: Normal secure fetch
         fetchResponse = await fetch(url.href, {
           method: "GET",
           headers: {
@@ -53,14 +75,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           },
           signal: controller.signal,
         });
-        console.log("[PageMD] Fetch response status:", fetchResponse.status, fetchResponse.statusText);
-      } finally {
-        if (originalRejectUnauthorized !== undefined) {
-          process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalRejectUnauthorized;
-        } else {
-          delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-        }
       }
+      console.log("[PageMD] Fetch response status:", fetchResponse.status, fetchResponse.statusText);
     } catch (fetchError) {
       console.log("[PageMD] Fetch error:", fetchError);
       throw fetchError;
