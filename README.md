@@ -6,14 +6,14 @@ Convert any webpage to clean, AI-friendly markdown.
 
 PageMD is a Next.js API service that fetches webpages, extracts the main content using Mozilla Readability, and converts it to clean markdown.
 
-**Deployed at:** https://pagemd-4gyfjypgq-nilukushs-projects.vercel.app
+**Deployed at:** https://pagemd.vercel.app
 
 ## Quick Start
 
 ### API Usage
 
 ```bash
-curl -X POST https://pagemd-4gyfjypgq-nilukushs-projects.vercel.app/api/convert \
+curl -X POST https://pagemd.vercel.app/api/convert \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com/article"}'
 ```
@@ -104,11 +104,18 @@ npm run lint
 
 ## Project Status
 
-**Phase 1:** ~75% complete
+**Phase 1:** ✅ Complete (v0.1.0)
 - ✅ API endpoint working
 - ✅ CLI tool built
-- ✅ Unit tests passing
+- ✅ All tests passing (21/21)
 - ✅ Deployed to Vercel
+- ✅ Documentation complete
+
+**Phase 2:** 🚧 In Progress
+- ⏳ Browser extension (planned)
+
+**Phase 3:** ⏳ Not Started
+- ⏳ AI-powered summarization
 
 ## License
 
