@@ -17,6 +17,7 @@ Next.js 15 | TypeScript 5.7 | @mozilla/readability | jsdom 24 | Turndown | Vites
 /lib/validator.ts          -> URL validation
 /cli/index.ts              -> CLI tool
 /app/api/health/route.ts   -> Health check
+/extension/                -> Chrome browser extension
 ```
 
 ## Key Files
@@ -28,6 +29,9 @@ Next.js 15 | TypeScript 5.7 | @mozilla/readability | jsdom 24 | Turndown | Vites
 | `lib/extractor.ts` | Main content extractor |
 | `lib/validator.ts` | URL validation |
 | `cli/index.ts` | CLI tool |
+| `extension/manifest.json` | Extension manifest |
+| `extension/popup/` | Extension popup UI |
+| `extension/background/` | Service worker |
 | `tests/api/convert.test.ts` | Integration tests (6) |
 | `tests/e2e/convert.test.ts` | E2E tests (3) |
 
@@ -43,9 +47,11 @@ npm run lint         # ESLint
 npm run cli -- <url> # CLI tool
 ```
 
-## Status: Phase 1 COMPLETE
+## Status: Phase 2 COMPLETE
 
-21/21 tests passing (100%) | Production deployed | v0.1.0
+- **Phase 1:** API, CLI, tests, docs deployed (v0.1.0)
+- **Phase 2:** Chrome browser extension complete
+- 21/21 tests passing (100%)
 
 ## Critical Patterns
 
@@ -79,4 +85,5 @@ Use `@/lib/*` for imports from the lib directory
 ## Documentation
 
 - Design Docs: `/docs/plans/2026-02-14-pagemd-*.md`
+- Extension Docs: `/extension/README.md`
 - Project Memory: MEMORY.md in project memory directory
