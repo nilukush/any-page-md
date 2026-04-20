@@ -29,9 +29,10 @@ Next.js 15 | TypeScript 5.7 | @mozilla/readability | jsdom 24 | Turndown | Vites
 | `lib/extractor.ts` | Main content extractor |
 | `lib/validator.ts` | URL validation |
 | `cli/index.ts` | CLI tool |
-| `extension/manifest.json` | Extension manifest |
-| `extension/popup/` | Extension popup UI |
-| `extension/background/` | Service worker |
+| `extension/manifest.json` | Extension manifest (MV3) with offscreen permission |
+| `extension/popup/index.js` | Popup logic (API fetch, response validation) |
+| `extension/background/service-worker.js` | Service worker (Offscreen API for clipboard) |
+| `extension/offscreen/offscreen.js` | Offscreen document for clipboard access |
 | `tests/api/convert.test.ts` | Integration tests (6) |
 | `tests/e2e/convert.test.ts` | E2E tests (3) |
 
@@ -81,6 +82,47 @@ Use `@/lib/*` for imports from the lib directory
 - jsdom
 - @mozilla/readability
 - turndown
+
+### Extension Clipboard (Manifest V3)
+
+**CRITICAL:** Service workers cannot access `navigator.clipboard` or DOM. Use Chrome's Offscreen API pattern.
+
+```javascript
+// In service-worker.js: Ensure offscreen document exists
+async function ensureOffscreenDocument() {
+  const existingContexts = await chrome.runtime.getContexts({
+    contextTypes: ['OFFSCREEN_DOCUMENT'],
+    documentUrls: [chrome.runtime.getURL('offscreen/offscreen.html')]
+  });
+
+  if (existingContexts.length > 0) return;
+
+  await chrome.offscreen.createDocument({
+    url: 'offscreen/offscreen.html',
+    reasons: ['CLIPBOARD'],
+    justification: 'Clipboard operations require offscreen document in MV3'
+  });
+}
+
+// Send copy request to offscreen
+await chrome.runtime.sendMessage({
+  action: 'copy-to-clipboard',
+  text: markdown
+});
+```
+
+```javascript
+// In offscreen/offscreen.js: Has DOM access
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.action === 'copy-to-clipboard') {
+    navigator.clipboard.writeText(message.text);
+  }
+});
+```
+
+**Flow:** Popup → API → Service Worker → Offscreen Document → Clipboard
+
+**Required Permissions:** `activeTab`, `offscreen`, `notifications`
 
 ## Documentation
 

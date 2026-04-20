@@ -1,7 +1,8 @@
 // PageMD Background Service Worker
-// Handles clipboard operations, notifications, and keyboard shortcuts
+// Handles clipboard operations via offscreen document, notifications, and keyboard shortcuts
 
 const API_URL = 'https://pagemd.vercel.app/api/convert';
+const OFFSCREEN_DOCUMENT_URL = 'offscreen/offscreen.html';
 
 // Listen for messages from popup and keyboard shortcuts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -13,6 +14,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         .then(() => sendResponse({ success: true }))
         .catch((error) => sendResponse({ success: false, error: error.message }));
       return true; // Keep message channel open for async response
+
+    case 'copy-and-notify':
+      // Used from popup: copy to clipboard and show notification
+      copyAndNotify(message.text);
+      sendResponse({ success: true }); // Immediate response, popup will close
+      break;
 
     case 'notify':
       showNotification(message.title, message.message, message.type);
@@ -43,44 +50,77 @@ chrome.commands.onCommand.addListener(async (command) => {
   }
 });
 
-// Copy text to clipboard
+/**
+ * Ensures the offscreen document exists for clipboard operations
+ * Creates it if it doesn't exist
+ */
+async function ensureOffscreenDocument() {
+  const existingContexts = await chrome.runtime.getContexts({
+    contextTypes: ['OFFSCREEN_DOCUMENT'],
+    documentUrls: [chrome.runtime.getURL(OFFSCREEN_DOCUMENT_URL)]
+  });
+
+  if (existingContexts.length > 0) {
+    console.log('[PageMD Background] Offscreen document already exists');
+    return;
+  }
+
+  console.log('[PageMD Background] Creating offscreen document');
+  await chrome.offscreen.createDocument({
+    url: OFFSCREEN_DOCUMENT_URL,
+    reasons: ['CLIPBOARD'],
+    justification: 'Clipboard operations require offscreen document in Manifest V3'
+  });
+}
+
+/**
+ * Copy text to clipboard using offscreen document
+ * This is the official Chrome pattern for clipboard operations in MV3
+ * @param {string} text - The text to copy
+ */
 async function copyToClipboard(text) {
+  if (!text) {
+    throw new Error('No text provided to copy');
+  }
+
+  console.log('[PageMD Background] Copying text to clipboard via offscreen, length:', text.length);
+
+  // Ensure offscreen document exists
+  await ensureOffscreenDocument();
+
+  // Send copy request to offscreen document
+  const response = await chrome.runtime.sendMessage({
+    action: 'copy-to-clipboard',
+    text: text
+  });
+
+  if (!response || !response.success) {
+    throw new Error(response?.error || 'Failed to copy to clipboard');
+  }
+
+  console.log('[PageMD Background] Clipboard operation successful via offscreen');
+}
+
+/**
+ * Copy text to clipboard and show notification
+ * Simplified with offscreen API - no timing/focus issues
+ * @param {string} text - The text to copy
+ */
+async function copyAndNotify(text) {
   try {
-    // Use the Clipboard API
-    await navigator.clipboard.writeText(text);
-    console.log('[PageMD Background] Copied to clipboard');
+    await copyToClipboard(text);
+    showNotification('PageMD', 'Markdown copied to clipboard!', 'success');
+    console.log('[PageMD Background] Copy-and-notify completed successfully');
   } catch (error) {
-    console.error('[PageMD Background] Clipboard error:', error);
-
-    // Fallback: Create a temporary text area
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    textArea.style.position = 'fixed';
-    textArea.style.left = '-999999px';
-    document.body.appendChild(textArea);
-    textArea.select();
-
-    try {
-      document.execCommand('copy');
-      console.log('[PageMD Background] Copied using fallback method');
-    } catch (fallbackError) {
-      throw new Error('Failed to copy to clipboard');
-    } finally {
-      document.body.removeChild(textArea);
-    }
+    console.error('[PageMD Background] Copy-and-notify failed:', error);
+    showNotification('PageMD Error', error.message, 'error');
   }
 }
 
-// Show desktop notification
+/**
+ * Show desktop notification
+ */
 function showNotification(title, message, type = 'basic') {
-  const options = {
-    type: 'basic',
-    iconUrl: type === 'success' ? '/icons/icon128.png' : '/icons/icon128.png',
-    title: title,
-    message: message,
-    priority: type === 'error' ? 2 : 1
-  };
-
   chrome.notifications.create({
     type: 'basic',
     iconUrl: chrome.runtime.getURL('icons/icon128.png'),
@@ -96,7 +136,9 @@ function showNotification(title, message, type = 'basic') {
   });
 }
 
-// Convert current tab to markdown
+/**
+ * Convert current tab to markdown
+ */
 async function convertCurrentTab() {
   // Get the active tab in the current window
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

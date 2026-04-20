@@ -59,21 +59,17 @@ async function convertPage(url) {
       throw new Error('No markdown content returned');
     }
 
-    // Copy to clipboard via messaging to service worker
+    // Send to service worker for clipboard copy
+    // Offscreen API handles clipboard without focus requirements
     await chrome.runtime.sendMessage({
-      action: 'copy',
+      action: 'copy-and-notify',
       text: data.markdown
     });
 
-    showSuccess('Markdown copied to clipboard!');
+    // Close popup - service worker will handle clipboard and notification
+    window.close();
 
-    // Show notification
-    await chrome.runtime.sendMessage({
-      action: 'notify',
-      title: 'PageMD',
-      message: 'Markdown copied to clipboard!',
-      type: 'success'
-    });
+    showSuccess('Converting...');
 
   } catch (error) {
     console.error('[PageMD] Conversion error:', error);
